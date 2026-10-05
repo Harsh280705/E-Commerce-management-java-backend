@@ -1,0 +1,135 @@
+services:
+  level3-postgres:
+    image: postgres:16-alpine
+    container_name: level3-postgres
+    environment:
+      POSTGRES_USER: ecom3
+      POSTGRES_PASSWORD: ecom3pass
+      POSTGRES_DB: ecom_level3
+    ports:
+      - "5445:5432"
+    volumes:
+      - level3_pgdata:/var/lib/postgresql/data
+    networks:
+      - level3-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecom3 -d ecom_level3"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  level3-mongodb:
+    image: mongo:7
+    container_name: level3-mongodb
+    ports:
+      - "27018:27017"
+    volumes:
+      - level3_mongodata:/data/db
+    networks:
+      - level3-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  level3-rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: level3-rabbitmq
+    ports:
+      - "5683:5672"
+      - "15773:15672"
+    volumes:
+      - level3_rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - level3-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  level3-elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: level3-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9211:9200"
+    volumes:
+      - level3_esdata:/usr/share/elasticsearch/data
+    networks:
+      - level3-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+
+  level3-java-api:
+    build:
+      context: ./backend
+    container_name: level3-java-api
+    environment:
+      POSTGRES_URL: jdbc:postgresql://level3-postgres:5432/ecom_level3
+      POSTGRES_USER: ecom3
+      POSTGRES_PASSWORD: ecom3pass
+      MONGO_URL: mongodb://level3-mongodb:27017/ecom_level3
+      RABBITMQ_HOST: level3-rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+      ELASTICSEARCH_URL: http://level3-elasticsearch:9200
+      ELASTICSEARCH_INDEX: level3_orders
+      SYNC_QUEUE: level3_order_sync
+      SYNC_EXCHANGE: level3_orders
+      SYNC_MAX_RETRIES: 5
+      POLL_INTERVAL_MS: 15000
+      POLL_LOOKBACK_SECONDS: 180
+      RUN_SEED_ON_START: "true"
+    ports:
+      - "8003:8080"
+    depends_on:
+      level3-postgres:
+        condition: service_healthy
+      level3-mongodb:
+        condition: service_healthy
+      level3-rabbitmq:
+        condition: service_healthy
+      level3-elasticsearch:
+        condition: service_healthy
+    networks:
+      - level3-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+    restart: unless-stopped
+
+  level3-nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    container_name: level3-nginx
+    ports:
+      - "8082:80"
+    depends_on:
+      level3-java-api:
+        condition: service_healthy
+    networks:
+      - level3-net
+    restart: unless-stopped
+
+volumes:
+  level3_pgdata:
+  level3_mongodata:
+  level3_rabbitmq_data:
+  level3_esdata:
+
+networks:
+  level3-net:
+    name: level3-net

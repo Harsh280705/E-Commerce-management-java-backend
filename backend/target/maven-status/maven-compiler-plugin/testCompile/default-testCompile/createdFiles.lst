@@ -1,0 +1,5 @@
+com\ecom\level3\OrderServiceTest.class
+com\ecom\level3\OrderSyncListenerTest.class
+com\ecom\level3\SyncServiceTest.class
+com\ecom\level3\OrderDocumentTest.class
+com\ecom\level3\SearchQueryTest.class

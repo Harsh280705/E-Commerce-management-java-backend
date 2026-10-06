@@ -7,9 +7,16 @@
         Proof: catalog shows <b>Wireless Mouse Pro</b>, old orders still show <b>Wireless Mouse</b>.</p>
     </div>
 
-    <div class="toolbar">
-      <input class="input" v-model="q" placeholder="Filter catalog…" style="flex:1;min-width:200px" />
-      <button class="btn" @click="startCreate">+ New product</button>
+    <div class="admin-toolbar">
+      <label class="f-search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M16.5 16.5L21 21" /></svg>
+        <input v-model="q" placeholder="Filter by title, SKU, category…" aria-label="Filter catalog" />
+      </label>
+      <span class="admin-count">{{ filtered.length }} product{{ filtered.length === 1 ? '' : 's' }}</span>
+      <button class="btn" @click="startCreate">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        New product
+      </button>
     </div>
     <div v-if="error" class="alert error">{{ error }}</div>
     <div v-if="msg" class="alert ok">{{ msg }}</div>
@@ -32,35 +39,41 @@
       </div>
     </div>
 
-    <div class="grid">
-      <div v-for="p in filtered" :key="p.id" class="pcard">
-        <div class="art">
-          <img :src="art(p)" :alt="p.title" loading="lazy" />
-          <span class="cat">{{ p.category }}</span>
+    <div class="admin-list">
+      <div v-for="p in paged" :key="p.id" class="admin-row">
+        <img class="admin-thumb" :src="art(p)" :alt="p.title" loading="lazy" />
+        <div class="admin-info">
+          <b>{{ p.title }}</b>
+          <span class="muted">{{ p.sku }} · {{ p.category }}</span>
         </div>
-        <div class="body">
-          <h3>{{ p.title }}</h3>
-          <div class="muted" style="font-size:12.5px">{{ p.sku }} · <span class="tag" :class="{ off: !p.active }">{{ p.active ? 'active' : 'inactive' }}</span></div>
-          <div class="row">
-            <span class="price">${{ Number(p.price).toFixed(2) }}</span>
-            <button class="btn secondary" @click="startEdit(p)">Edit</button>
-          </div>
-        </div>
+        <span class="stock" :class="{ off: !p.active }"><i></i>{{ p.active ? 'Active' : 'Inactive' }}</span>
+        <span class="price">${{ Number(p.price).toFixed(2) }}</span>
+        <button class="btn secondary" @click="startEdit(p)">Edit</button>
       </div>
     </div>
+
+    <Pagination
+      :page="page"
+      :total-pages="totalPages"
+      :range-text="rangeText"
+      @change="page = $event"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { productsApi } from '../api/client.js'
 import { productArt } from '../api/productArt.js'
+import Pagination from '../components/Pagination.vue'
 
 const products = ref([])
 const editing = ref(null)
 const error = ref('')
 const msg = ref('')
 const q = ref('')
+const page = ref(1)
+const PAGE_SIZE = 12
 const form = reactive({ sku: '', title: '', description: '', price: 0, category: '', tags: '', brand: '', active: true })
 
 const art = (p) => productArt(p)
@@ -69,9 +82,30 @@ const filtered = computed(() => {
   if (!needle) return products.value
   return products.value.filter(p => [p.title, p.sku, p.category].join(' ').toLowerCase().includes(needle))
 })
+const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / PAGE_SIZE)))
+const paged = computed(() => {
+  const p = Math.min(Math.max(1, page.value), totalPages.value)
+  return filtered.value.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE)
+})
+const rangeText = computed(() => {
+  const n = filtered.value.length
+  if (!n) return 'No products'
+  const p = Math.min(Math.max(1, page.value), totalPages.value)
+  const from = (p - 1) * PAGE_SIZE + 1
+  return `Showing ${from}–${Math.min(p * PAGE_SIZE, n)} of ${n} products`
+})
+
+// Preserve filter/search state across pages; reset to page 1 only when the
+// filter itself changes. Clamp when the catalog shrinks/grows (create/edit).
+watch(q, () => { page.value = 1 })
+watch([filtered, totalPages], () => {
+  if (page.value > totalPages.value) page.value = totalPages.value
+  if (page.value < 1) page.value = 1
+})
 
 async function load() {
   products.value = await productsApi.list({ all: true }).catch(() => [])
+  if (page.value > totalPages.value) page.value = totalPages.value
 }
 
 function startCreate() {
@@ -100,11 +134,15 @@ async function save() {
     active: form.active
   }
   try {
+    const isCreate = !editing.value.id
     if (editing.value.id) await productsApi.update(editing.value.id, payload)
     else await productsApi.create(payload)
     msg.value = 'Saved to MongoDB. Historical orders untouched.'
     editing.value = null
     await load()
+    // New products land at the end of the list — jump there so the user sees it.
+    // Edits keep the current page (clamped inside load()).
+    if (isCreate) page.value = totalPages.value
   } catch (e) {
     error.value = e.response?.data?.detail || 'Save failed.'
   }

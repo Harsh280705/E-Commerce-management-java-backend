@@ -13,7 +13,8 @@ public class WebConfig implements WebMvcConfigurer {
         .allowedOrigins("http://localhost:5173", "http://127.0.0.1:5173",
             "http://localhost:8080", "http://127.0.0.1:8080",
             "http://localhost", "http://127.0.0.1",
-            "http://localhost:8082", "http://127.0.0.1:8082")
+            "http://localhost:8082", "http://127.0.0.1:8082",
+            "https://pedigree-silicon-levitate.ngrok-free.dev")
         .allowedMethods("*")
         .allowedHeaders("*")
         .allowCredentials(true);

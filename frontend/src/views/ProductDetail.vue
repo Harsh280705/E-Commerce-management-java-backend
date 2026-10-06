@@ -1,16 +1,16 @@
 <template>
   <div>
-    <router-link to="/">← Back to store</router-link>
+    <router-link class="back-link" to="/">← Back to store</router-link>
     <div v-if="error" class="alert error" style="margin-top:12px">{{ error }}</div>
-    <div v-else-if="product" class="split" style="margin-top:12px">
+    <div v-else-if="product" class="detail split" style="margin-top:12px">
       <div class="detail-art"><img :src="art(product)" :alt="product.title" /></div>
-      <div class="card">
-        <span class="tag">{{ product.category }}</span>
+      <div class="card buy-panel">
+        <span class="eyebrow">{{ product.category }}</span>
         <div class="detail-info">
           <h1>{{ product.title }}</h1>
           <div class="muted">{{ product.description }}</div>
           <div class="detail-price">${{ Number(product.price).toFixed(2) }}</div>
-          <div><span v-for="t in (product.tags || [])" :key="t" class="tag">{{ t }}</span></div>
+          <div class="tags"><span v-for="t in (product.tags || [])" :key="t" class="tag">{{ t }}</span></div>
         </div>
         <table class="spec-table">
           <tbody>
@@ -22,14 +22,21 @@
             </tr>
           </tbody>
         </table>
-        <div class="toolbar">
-          <span class="qty">
-            <button @click="qty = Math.max(1, qty - 1)">−</button>{{ qty }}<button @click="qty += 1">+</button>
+        <div class="buy-actions">
+          <span class="qty" role="group" aria-label="Quantity">
+            <button @click="qty = Math.max(1, qty - 1)" aria-label="Decrease quantity">−</button><b>{{ qty }}</b><button @click="qty += 1" aria-label="Increase quantity">+</button>
           </span>
-          <button class="btn" @click="addToCart(product, qty); added = true">Add to Cart</button>
-          <router-link class="btn dark" to="/checkout">Go to Checkout</router-link>
+          <button class="add-btn grow" :class="{ added: justAdded }" @click="handleAdd">
+            <svg v-if="!justAdded" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 12.2a1.5 1.5 0 0 0 1.5 1.3h8.6a1.5 1.5 0 0 0 1.5-1.2L21 8H6" /><circle cx="10" cy="20.5" r="1.3" /><circle cx="18" cy="20.5" r="1.3" /></svg>
+            <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7" /></svg>
+            {{ justAdded ? 'Added' : 'Add to Cart' }}
+          </button>
         </div>
-        <div v-if="added" class="alert ok">Added to cart.</div>
+        <router-link class="btn dark block" to="/checkout">Go to Checkout</router-link>
+        <div v-if="added" class="added-note" role="status">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.5l5 5L19.5 7" /></svg>
+          Added to cart.
+        </div>
       </div>
     </div>
   </div>
@@ -47,8 +54,19 @@ const product = ref(null)
 const error = ref('')
 const qty = ref(1)
 const added = ref(false)
+const justAdded = ref(false)
+let addedTimer = null
 
 const art = (p) => productArt(p)
+
+function handleAdd() {
+  if (!product.value) return
+  addToCart(product.value, qty.value)
+  added.value = true
+  justAdded.value = true
+  if (addedTimer) clearTimeout(addedTimer)
+  addedTimer = setTimeout(() => { justAdded.value = false }, 1300)
+}
 
 onMounted(async () => {
   try {

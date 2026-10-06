@@ -6,26 +6,35 @@
       <p class="muted">Full-text admin search across customers and items — served by the search index.</p>
     </div>
 
-    <div class="card">
-      <div class="toolbar" style="border:0;box-shadow:none;padding:0;margin:0 0 12px">
-        <input class="input" v-model="f.q" placeholder="Search customers, products, orders…" style="min-width:260px;flex:1" @keyup.enter="search(1)" />
+    <div class="card search-card">
+      <div class="search-row">
+        <label class="f-search grow">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M16.5 16.5L21 21" /></svg>
+          <input v-model="f.q" placeholder="Search customers, products, orders…" aria-label="Search orders" @keyup.enter="search(1)" />
+        </label>
         <button class="btn" @click="search(1)">Search</button>
       </div>
-      <div class="toolbar" style="border:0;box-shadow:none;padding:0;margin:0">
-        <span class="checkline" v-for="s in statuses" :key="s">
-          <input type="checkbox" :id="'st-' + s" :value="s" v-model="f.statuses" />
-          <label :for="'st-' + s"><span class="status" :class="s">{{ s }}</span></label>
-        </span>
-        <input class="input" type="date" v-model="f.date_from" title="From" />
-        <input class="input" type="date" v-model="f.date_to" title="To" />
-        <input class="input" type="number" v-model.number="f.min_total" placeholder="Min $" style="width:110px" />
-        <input class="input" type="number" v-model.number="f.max_total" placeholder="Max $" style="width:110px" />
-        <select class="input" v-model="f.sort">
-          <option value="newest">Newest</option>
-          <option value="oldest">Oldest</option>
-          <option value="total_desc">Total ↓</option>
-          <option value="total_asc">Total ↑</option>
-        </select>
+      <div class="filter-grid">
+        <div class="f-group"><span>Status</span>
+          <div class="status-pills">
+            <label v-for="s in statuses" :key="s" class="pill-check" :class="{ on: f.statuses.includes(s) }">
+              <input type="checkbox" :value="s" v-model="f.statuses" />
+              <span class="status" :class="s">{{ s }}</span>
+            </label>
+          </div>
+        </div>
+        <label class="f-group"><span>From</span><input class="input" type="date" v-model="f.date_from" /></label>
+        <label class="f-group"><span>To</span><input class="input" type="date" v-model="f.date_to" /></label>
+        <label class="f-group"><span>Min $</span><input class="input" type="number" v-model.number="f.min_total" placeholder="0" /></label>
+        <label class="f-group"><span>Max $</span><input class="input" type="number" v-model.number="f.max_total" placeholder="∞" /></label>
+        <label class="f-group"><span>Sort</span>
+          <select class="input" v-model="f.sort" @change="search(1)">
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="total_desc">Total ↓</option>
+            <option value="total_asc">Total ↑</option>
+          </select>
+        </label>
       </div>
     </div>
 
@@ -39,8 +48,8 @@
     <div v-else-if="!loading && !results.length" class="card empty">
       <div class="big">🔍</div><h3>No orders match</h3><p class="muted">Adjust the search or filters.</p>
     </div>
-    <div v-else class="card" style="padding:0;overflow:hidden">
-      <div class="table-wrap" style="border:0">
+    <div v-else class="card results-card">
+      <div class="table-wrap">
         <table class="results">
           <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th></tr></thead>
           <tbody>
@@ -55,18 +64,30 @@
           </tbody>
         </table>
       </div>
-    </div>
-    <div class="toolbar">
-      <button class="btn secondary" :disabled="page <= 1" @click="search(page - 1)">← Prev</button>
-      <span class="muted">Page {{ page }} · {{ total }} hits</span>
-      <button class="btn secondary" :disabled="results.length < f.size" @click="search(page + 1)">Next →</button>
+      <div class="table-foot">
+        <label class="f-field inline"><span>Rows</span>
+          <select class="input page-size" v-model.number="f.size" @change="search(1)" title="Page size" aria-label="Rows per page">
+            <option :value="10">10</option>
+            <option :value="20">20</option>
+            <option :value="50">50</option>
+          </select>
+        </label>
+        <Pagination
+          :page="page"
+          :total-pages="totalPages"
+          :range-text="rangeText"
+          bare
+          @change="search($event)"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { searchApi } from '../api/client.js'
+import Pagination from '../components/Pagination.vue'
 
 const statuses = ['PENDING', 'PROCESSING', 'SHIPPED']
 const f = reactive({ q: '', statuses: [], date_from: '', date_to: '', min_total: null, max_total: null, sort: 'newest', size: 20 })
@@ -77,8 +98,20 @@ const page = ref(1)
 const error = ref('')
 const loading = ref(true)
 
+const totalPages = computed(() => Math.max(1, Math.ceil((Number(total.value) || 0) / (Number(f.size) || 20))))
+const rangeText = computed(() => {
+  const n = Number(total.value) || 0
+  if (!n) return 'No orders'
+  const size = Number(f.size) || 20
+  const p = Math.min(Math.max(1, page.value), totalPages.value)
+  const from = (p - 1) * size + 1
+  return `Showing ${from}–${Math.min(p * size, n)} of ${n} orders`
+})
+
 async function search(p = 1) {
-  page.value = p
+  // Clamp to the known page count so stale page numbers never query past the end.
+  const knownMax = Math.max(1, Math.ceil((Number(total.value) || 0) / (Number(f.size) || 20)))
+  page.value = Math.min(Math.max(1, p), knownMax)
   error.value = ''
   loading.value = true
   try {
@@ -89,11 +122,29 @@ async function search(p = 1) {
       date_to: f.date_to ? f.date_to + 'T23:59:59' : null,
       min_total: f.min_total ?? null,
       max_total: f.max_total ?? null,
-      sort: f.sort, page: p, size: f.size
+      sort: f.sort, page: page.value, size: f.size
     })
     results.value = out.results
     aggs.value = out.aggs || {}
     total.value = out.total
+    // Result count changed (new filters): if current page is now past the end,
+    // fetch the last valid page once using the same filters/sort.
+    const maxPage = Math.max(1, Math.ceil((Number(out.total) || 0) / (Number(f.size) || 20)))
+    if (page.value > maxPage) {
+      page.value = maxPage
+      const fix = await searchApi.orders({
+        q: f.q || null,
+        statuses: f.statuses.length ? f.statuses : null,
+        date_from: f.date_from || null,
+        date_to: f.date_to ? f.date_to + 'T23:59:59' : null,
+        min_total: f.min_total ?? null,
+        max_total: f.max_total ?? null,
+        sort: f.sort, page: page.value, size: f.size
+      })
+      results.value = fix.results
+      aggs.value = fix.aggs || {}
+      total.value = fix.total
+    }
   } catch (e) {
     error.value = e.response?.status === 503
       ? 'Search index unavailable (Elasticsearch down). PostgreSQL orders are safe.'

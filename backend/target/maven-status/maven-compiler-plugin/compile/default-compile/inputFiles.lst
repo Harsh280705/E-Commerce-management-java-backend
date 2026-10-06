@@ -26,6 +26,7 @@ D:\Yantra3loka LLP\Training\Week 2 (28 September to 4 October)\Level 3 - E-Comme
 D:\Yantra3loka LLP\Training\Week 2 (28 September to 4 October)\Level 3 - E-Commerce Backend\backend\src\main\java\com\ecom\level3\service\SeedService.java
 D:\Yantra3loka LLP\Training\Week 2 (28 September to 4 October)\Level 3 - E-Commerce Backend\backend\src\main\java\com\ecom\level3\config\RestTemplateConfig.java
 D:\Yantra3loka LLP\Training\Week 2 (28 September to 4 October)\Level 3 - E-Commerce Backend\backend\src\main\java\com\ecom\level3\messaging\OrderSyncListener.java
+D:\Yantra3loka LLP\Training\Week 2 (28 September to 4 October)\Level 3 - E-Commerce Backend\backend\src\main\java\com\ecom\level3\service\CatalogExpansionService.java
 D:\Yantra3loka LLP\Training\Week 2 (28 September to 4 October)\Level 3 - E-Commerce Backend\backend\src\main\java\com\ecom\level3\controller\ProductController.java
 D:\Yantra3loka LLP\Training\Week 2 (28 September to 4 October)\Level 3 - E-Commerce Backend\backend\src\main\java\com\ecom\level3\model\Level3OrderItem.java
 D:\Yantra3loka LLP\Training\Week 2 (28 September to 4 October)\Level 3 - E-Commerce Backend\backend\src\main\java\com\ecom\level3\scheduler\PollingSyncScheduler.java

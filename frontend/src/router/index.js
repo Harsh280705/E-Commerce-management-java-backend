@@ -12,6 +12,7 @@ export default createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: Storefront },
+    { path: '/shop', component: Storefront },
     { path: '/products/:id', component: ProductDetail },
     { path: '/checkout', component: Checkout },
     { path: '/orders', component: MyOrders },

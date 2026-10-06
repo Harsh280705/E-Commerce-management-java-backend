@@ -95,14 +95,3 @@ npm run build
 
 See `.env.example` (Level 3 names/ports/index/queue only, no secrets).
 
-## Level 3 isolation (vs Level 2)
-
-| Resource | Level 2 | Level 3 |
-|---|---|---|
-| Compose containers | ecom2-* | level3-* |
-| PG host port / db / tables | 5435 / ecom_orders / users… | 5445 / ecom_level3 / level3_* |
-| Mongo host port / db | 27017 / ecom | 27018 / ecom_level3 |
-| RabbitMQ ports / queue | 5673/15673 / order_sync | 5683/15773 / level3_order_sync |
-| ES host port / index | 9201 / orders | 9211 / level3_orders |
-| API / frontend ports | 8002 / 80 | 8003 / 8082 |
-| Volumes / network | pgdata… / level2-e-commerce_default | level3_* / level3-net |
